@@ -1,4 +1,11 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import 'erd_diagram.dart';
+import 'models.dart';
 
 void main() {
   runApp(const MyApp());
@@ -7,45 +14,20 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+      title: 'Flutter ERD',
+      theme: ThemeData.from(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const MyHomePage(title: 'Flutter ERD Diagram'),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
 
   final String title;
 
@@ -54,68 +36,238 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  SchemaModel? schema;
+  String? errorMessage;
+  String? statusMessage;
+  bool loading = false;
 
-  void _incrementCounter() {
+  Future<void> _pickJsonFile() async {
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      errorMessage = null;
+      loading = true;
     });
+
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) {
+        return;
+      }
+
+      final file = result.files.single;
+      if (file.bytes == null) {
+        throw StateError('Unable to read selected JSON file.');
+      }
+      final content = utf8.decode(file.bytes!);
+      setState(() {
+        statusMessage = 'File read successfully.';
+      });
+
+      final jsonMap = jsonDecode(content) as Map<String, dynamic>;
+      setState(() {
+        statusMessage = 'JSON parsed successfully.';
+      });
+
+      final validationErrors = SchemaModel.validateJson(jsonMap);
+      if (validationErrors.isNotEmpty) {
+        throw FormatException(
+          'Schema validation failed:\n${validationErrors.join('\n')}',
+        );
+      }
+
+      final loadedSchema = SchemaModel.fromJson(jsonMap);
+      setState(() {
+        schema = loadedSchema;
+        statusMessage =
+            'Diagram created with ${loadedSchema.tables.length} tables.';
+      });
+    } catch (error) {
+      setState(() {
+        errorMessage = 'Failed to load JSON: ${error.toString()}';
+      });
+    } finally {
+      setState(() {
+        loading = false;
+      });
+    }
+  }
+
+  void _addTable() {
+    final nextIndex = (schema?.tables.length ?? 0) + 1;
+    final newTable = TableModel(
+      tableName: 'table_$nextIndex',
+      description: null,
+      columns: [
+        ColumnModel(
+          columnName: 'id',
+          description: 'Primary key',
+          dataType: 'bigserial',
+          isPrimaryKey: true,
+          isNullable: false,
+          isUnique: true,
+          foreignKey: null,
+        ),
+      ],
+      indices: [],
+      constraints: [],
+    );
+
+    final current = schema;
+    final newSchema = SchemaModel(
+      dbType: current?.dbType ?? 'PostgreSQL',
+      databaseName: current?.databaseName ?? '',
+      schemaName: current?.schemaName ?? '',
+      tables: [...?current?.tables, newTable],
+    );
+
+    setState(() {
+      schema = newSchema;
+      statusMessage = 'Added table ${newTable.tableName}.';
+      errorMessage = null;
+    });
+  }
+
+  void _removeTable(String tableName) {
+    final current = schema;
+    if (current == null) return;
+
+    final remainingTables = current.tables
+        .where((table) => table.tableName != tableName)
+        .toList();
+
+    setState(() {
+      schema = SchemaModel(
+        dbType: current.dbType,
+        databaseName: current.databaseName,
+        schemaName: current.schemaName,
+        tables: remainingTables,
+      );
+      statusMessage = 'Removed table $tableName.';
+      errorMessage = null;
+    });
+  }
+
+  Future<void> _exportJson() async {
+    if (schema == null) return;
+    final content = const JsonEncoder.withIndent(
+      '  ',
+    ).convert(schema!.toJson());
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Export ERD JSON'),
+          content: SizedBox(
+            width: 600,
+            child: SingleChildScrollView(child: SelectableText(content)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => _copyJsonToClipboard(content),
+              child: const Text('Copy'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _copyJsonToClipboard(String content) async {
+    await Clipboard.setData(ClipboardData(text: content));
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('JSON copied to clipboard.')));
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
         title: Text(widget.title),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.folder_open),
+            onPressed: loading ? null : _pickJsonFile,
+            tooltip: 'Open ERD JSON file',
+          ),
+          if (schema != null)
+            IconButton(
+              icon: const Icon(Icons.save_outlined),
+              onPressed: _exportJson,
+              tooltip: 'Export ERD JSON',
+            ),
+        ],
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+            Row(
+              children: [
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.folder_open),
+                  label: const Text('Select ERD JSON File'),
+                  onPressed: loading ? null : _pickJsonFile,
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Table'),
+                  onPressed: loading ? null : _addTable,
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.delete),
+                  label: const Text('Remove Last Table'),
+                  onPressed: (schema == null || schema!.tables.isEmpty)
+                      ? null
+                      : () => _removeTable(schema!.tables.last.tableName),
+                ),
+                const SizedBox(width: 12),
+                if (schema != null)
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.save_outlined),
+                    label: const Text('Export JSON'),
+                    onPressed: _exportJson,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (loading) const LinearProgressIndicator(),
+            if (errorMessage != null) ...[
+              const SizedBox(height: 12),
+              Text(errorMessage!, style: const TextStyle(color: Colors.red)),
+            ],
+            if (statusMessage != null && errorMessage == null) ...[
+              const SizedBox(height: 12),
+              Text(
+                statusMessage!,
+                style: TextStyle(color: Colors.green.shade700),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Expanded(
+              child: schema != null
+                  ? ERDDiagram(schema: schema!, onRemoveTable: _removeTable)
+                  : const Center(
+                      child: Text(
+                        'Select a JSON file to render the ERD diagram.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
       ),
     );
   }

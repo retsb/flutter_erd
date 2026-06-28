@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/flutter_erd.schema.json",
+  "title": "Flutter ERD Configuration",
+  "description": "JSON schema for describing DB schema.",
+  "type": "object",
+  "required": ["dbType", "databaseName", "schemaName", "tables"],
+  "additionalProperties": false,
+  "properties": {
+    "dbType": {
+      "type": "string",
+      "description": "The type of the database (e.g., MySQL, PostgreSQL, SQLite)."
+    },
+    "databaseName": {
+      "type": "string",
+      "description": "The name of the database."
+    },
+    "schemaName": {
+      "type": "string",
+      "description": "The name of the schema within the database."
+    },
+    "tables": {
+      "type": "array",
+      "description": "A list of tables in the schema.",
+      "items": {
+        "$ref": "#/properties/Table"
+      }
+    },
+    "Table": {
+      "type": "object",
+      "description": "A reusable table definition.",
+      "additionalProperties": false,
+      "required": ["tableName", "columns"],
+      "properties": {
+        "tableName": {
+          "type": "string",
+          "description": "The name of the table."
+        },
+        "description": {
+          "type": "string",
+          "description": "An optional description of the table."
+        },
+        "columns": {
+          "type": "array",
+          "description": "A list of columns in the table.",
+          "items": {
+            "$ref": "#/properties/Column"
+          }
+        },
+        "indices": {
+          "type": "array",
+          "description": "A list of indexes defined on the table.",
+          "items": {
+            "$ref": "#/properties/Index"
+          }
+        },
+        "constraints": {
+          "type": "array",
+          "description": "A list of table-level constraints.",
+          "items": {
+            "$ref": "#/properties/Constraint"
+          }
+        }
+      }
+    },
+    "Column": {
+      "type": "object",
+      "description": "A reusable column definition.",
+      "additionalProperties": false,
+      "required": ["columnName", "dataType"],
+      "properties": {
+        "columnName": {
+          "type": "string",
+          "description": "The name of the column."
+        },
+        "description": {
+          "type": "string",
+          "description": "An optional description of the column."
+        },
+        "dataType": {
+          "type": "string",
+          "description": "The PostgreSQL data type of the column.",
+          "enum": [
+            "bigint",
+            "bigserial",
+            "bit",
+            "boolean",
+            "bytea",
+            "cidr",
+            "character varying",
+            "char",
+            "circle",
+            "date",
+            "decimal",
+            "double precision",
+            "inet",
+            "interval",
+            "json",
+            "jsonb",
+            "numeric",
+            "real",
+            "serial",
+            "smallint",
+            "smallserial",
+            "text",
+            "time",
+            "time with time zone",
+            "timetz",
+            "timestamp",
+            "timestamp with time zone",
+            "timestamp without time zone",
+            "timestamptz",
+            "tsquery",
+            "tsvector",
+            "uuid",
+            "varbit",
+            "varchar",
+            "xml"
+          ]
+        },
+        "isPrimaryKey": {
+          "type": "boolean",
+          "description": "Indicates if the column is a primary key."
+        },
+        "isNullable": {
+          "type": "boolean",
+          "description": "Indicates if the column can contain NULL values."
+        },
+        "isUnique": {
+          "type": "boolean",
+          "description": "Indicates if the column values are unique."
+        },
+        "foreignKey": {
+          "type": "object",
+          "description": "Foreign key reference details for this column.",
+          "additionalProperties": false,
+          "required": ["referenceTable", "referenceColumns"],
+          "properties": {
+            "referenceTable": {
+              "type": "string",
+              "description": "The referenced table name."
+            },
+            "referenceColumns": {
+              "type": "array",
+              "description": "The referenced column or columns in the foreign table.",
+              "items": {
+                "type": "string"
+              }
+            },
+            "onDelete": {
+              "type": "string",
+              "description": "The ON DELETE action for the foreign key.",
+              "enum": ["NO ACTION", "RESTRICT", "CASCADE", "SET NULL", "SET DEFAULT"]
+            },
+            "onUpdate": {
+              "type": "string",
+              "description": "The ON UPDATE action for the foreign key.",
+              "enum": ["NO ACTION", "RESTRICT", "CASCADE", "SET NULL", "SET DEFAULT"]
+            }
+          }
+        }
+      }
+    },
+    "Index": {
+      "type": "object",
+      "description": "A reusable index definition.",
+      "additionalProperties": false,
+      "required": ["indexName", "columns"],
+      "properties": {
+        "indexName": {
+          "type": "string",
+          "description": "The name of the index."
+        },
+        "description": {
+          "type": "string",
+          "description": "An optional description of the index."
+        },
+        "columns": {
+          "type": "array",
+          "description": "The columns included in the index.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "isUnique": {
+          "type": "boolean",
+          "description": "Indicates if the index enforces uniqueness."
+        },
+        "indexType": {
+          "type": "string",
+          "description": "The index type (e.g. btree, gin, gist, hash).",
+          "enum": ["btree", "hash", "gin", "gist", "spgist", "brin"]
+        }
+      }
+    },
+    "Constraint": {
+      "type": "object",
+      "description": "A reusable table constraint definition.",
+      "additionalProperties": false,
+      "required": ["constraintName", "constraintType"],
+      "properties": {
+        "constraintName": {
+          "type": "string",
+          "description": "The name of the constraint."
+        },
+        "description": {
+          "type": "string",
+          "description": "An optional description of the constraint."
+        },
+        "constraintType": {
+          "type": "string",
+          "description": "The type of table constraint.",
+          "enum": ["primary key", "foreign key", "unique", "check", "exclude"]
+        },
+        "columns": {
+          "type": "array",
+          "description": "The columns included in the constraint.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "referenceTable": {
+          "type": "string",
+          "description": "The referenced table for foreign key constraints."
+        },
+        "referenceColumns": {
+          "type": "array",
+          "description": "The referenced columns for foreign key constraints.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expression": {
+          "type": "string",
+          "description": "The expression used for check or exclude constraints."
+        }
+      }
+    }
+  }
+}

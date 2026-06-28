@@ -1,0 +1,190 @@
+{
+  "dbType": "PostgreSQL",
+  "databaseName": "sales_db",
+  "schemaName": "public",
+  "tables": [
+    {
+      "tableName": "users",
+      "description": "Stores application users.",
+      "columns": [
+        {
+          "columnName": "user_id",
+          "description": "Primary key for the user.",
+          "dataType": "bigserial",
+          "isPrimaryKey": true,
+          "isNullable": false,
+          "isUnique": true
+        },
+        {
+          "columnName": "username",
+          "description": "Unique username.",
+          "dataType": "varchar",
+          "isNullable": false,
+          "isUnique": true
+        },
+        {
+          "columnName": "email",
+          "description": "User email address.",
+          "dataType": "varchar",
+          "isNullable": false,
+          "isUnique": true
+        },
+        {
+          "columnName": "created_at",
+          "description": "When the user was created.",
+          "dataType": "timestamp with time zone",
+          "isNullable": false
+        }
+      ],
+      "indices": [
+        {
+          "indexName": "users_username_idx",
+          "description": "Index for fast username lookup.",
+          "columns": ["username"],
+          "isUnique": true,
+          "indexType": "btree"
+        }
+      ],
+      "constraints": [
+        {
+          "constraintName": "users_pkey",
+          "description": "Primary key constraint for users.",
+          "constraintType": "primary key",
+          "columns": ["user_id"]
+        }
+      ]
+    },
+    {
+      "tableName": "products",
+      "description": "Product catalog.",
+      "columns": [
+        {
+          "columnName": "product_id",
+          "description": "Primary key for the product.",
+          "dataType": "bigserial",
+          "isPrimaryKey": true,
+          "isNullable": false,
+          "isUnique": true
+        },
+        {
+          "columnName": "name",
+          "description": "Product name.",
+          "dataType": "varchar",
+          "isNullable": false
+        },
+        {
+          "columnName": "description",
+          "description": "Product description.",
+          "dataType": "text",
+          "isNullable": true
+        },
+        {
+          "columnName": "price",
+          "description": "Product price.",
+          "dataType": "numeric",
+          "isNullable": false
+        }
+      ],
+      "indices": [
+        {
+          "indexName": "products_name_idx",
+          "description": "Search index on product name.",
+          "columns": ["name"],
+          "isUnique": false,
+          "indexType": "btree"
+        }
+      ],
+      "constraints": [
+        {
+          "constraintName": "products_pkey",
+          "description": "Primary key constraint for products.",
+          "constraintType": "primary key",
+          "columns": ["product_id"]
+        }
+      ]
+    },
+    {
+      "tableName": "orders",
+      "description": "Customer orders.",
+      "columns": [
+        {
+          "columnName": "order_id",
+          "description": "Primary key for the order.",
+          "dataType": "bigserial",
+          "isPrimaryKey": true,
+          "isNullable": false,
+          "isUnique": true
+        },
+        {
+          "columnName": "user_id",
+          "description": "User who placed the order.",
+          "dataType": "bigint",
+          "isNullable": false,
+          "foreignKey": {
+            "referenceTable": "users",
+            "referenceColumns": ["user_id"],
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION"
+          }
+        },
+        {
+          "columnName": "product_id",
+          "description": "Product ordered.",
+          "dataType": "bigint",
+          "isNullable": false,
+          "foreignKey": {
+            "referenceTable": "products",
+            "referenceColumns": ["product_id"],
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION"
+          }
+        },
+        {
+          "columnName": "quantity",
+          "description": "Quantity ordered.",
+          "dataType": "integer",
+          "isNullable": false
+        },
+        {
+          "columnName": "ordered_at",
+          "description": "Order creation timestamp.",
+          "dataType": "timestamp with time zone",
+          "isNullable": false
+        }
+      ],
+      "indices": [
+        {
+          "indexName": "orders_user_id_idx",
+          "description": "Index for orders by user.",
+          "columns": ["user_id"],
+          "isUnique": false,
+          "indexType": "btree"
+        }
+      ],
+      "constraints": [
+        {
+          "constraintName": "orders_pkey",
+          "description": "Primary key constraint for orders.",
+          "constraintType": "primary key",
+          "columns": ["order_id"]
+        },
+        {
+          "constraintName": "orders_user_fkey",
+          "description": "Foreign key constraint to users.",
+          "constraintType": "foreign key",
+          "columns": ["user_id"],
+          "referenceTable": "users",
+          "referenceColumns": ["user_id"]
+        },
+        {
+          "constraintName": "orders_product_fkey",
+          "description": "Foreign key constraint to products.",
+          "constraintType": "foreign key",
+          "columns": ["product_id"],
+          "referenceTable": "products",
+          "referenceColumns": ["product_id"]
+        }
+      ]
+    }
+  ]
+}
